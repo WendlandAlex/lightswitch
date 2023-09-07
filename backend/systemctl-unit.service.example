@@ -1,0 +1,13 @@
+[Unit]
+Description=${NAME}
+After=network.target
+
+[Service]
+Type=simple
+User=${USER}
+WorkingDirectory=${WORKDIR}
+ExecStart=node ${WORKDIR}index.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
