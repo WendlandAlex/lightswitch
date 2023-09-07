@@ -1,0 +1,13 @@
+.env
+**/.env
+
+
+**/Dockerfile
+**/fly.toml
+
+
+**/default.conf
+**/node_modules/
+
+**/dist/*
+!**/dist
