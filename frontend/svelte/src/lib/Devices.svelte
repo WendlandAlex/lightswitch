@@ -11,16 +11,18 @@
         valid: false
     }
 
-    const isTotpSet = (totp={token:'',valid:false}) => {
+    // import DeviceCard from "./DeviceCard.svelte";
+
+    const isTotpSet = (totp = {token: '', valid: false}) => {
         if (totp.token.length < 6) {
-            return { class: "text-amber-500 font-bold bg-indigo-900", text: 'Set TOTP' }
+            return {class: "text-amber-500 font-bold bg-indigo-900", text: 'Set TOTP'}
         }
 
         if (totp.valid === true) {
-            return { class: "text-white font-bold bg-green-500", text: 'TOTP is Valid' }
+            return {class: "text-white font-bold bg-green-500", text: 'TOTP is Valid'}
         }
 
-        return { class: "text-indigo-900 font-bold bg-amber-500", text: 'TOTP invalid' }
+        return {class: "text-indigo-900 font-bold bg-amber-500", text: 'TOTP invalid'}
     }
 
     $: totpIsSet = isTotpSet(totp)
@@ -53,11 +55,18 @@
     }
 
     export const getClassByPowerState = (device) => {
+        // initial state when powerState === false
+        const res = {
+            outer: "border border-2 border-white rounded-md p-2 bg-white text-gray-900",
+            inner: "border border-2 border-indigo-900 rounded-md m-2 px-4 py-2 grid auto-cols-auto auto-rows-auto gap-1",
+        }
         const powerState = getPowerState(device)
-        return powerState === true ?
-            "border border-2 border-white rounded-md p-2 bg-amber-500 text-indigo-900"
-            :
-            "border border-2 border-white rounded-md p-2 bg-white"
+        if (powerState === true) {
+            res.outer = "border border-2 border-white rounded-md p-2 bg-white text-gray-900"
+            res.inner = "border border-2 border-amber-500 rounded-md m-2 px-4 py-2 grid auto-cols-auto auto-rows-auto gap-1"
+        }
+
+        return res
     }
 
     export const toggleGlobalPowerState = async (devices) => {
@@ -66,11 +75,24 @@
         }
 
         const _globalPowerState = !$globalPowerState
-        const res = await axios.post(`${apiUrl}/submit`, {
-            hosts: devices.map(i => i.host),
-            powerState: _globalPowerState,
-            totp: totp
-        })
+        let res
+        try {
+            res = await axios.post(`${apiUrl}/submit`, {
+                hosts: devices.map(i => i.host),
+                powerState: _globalPowerState,
+                totp: totp
+            })
+        } catch (error) {
+            if (error.code && error.code === "ERR_NETWORK") {
+                console.log('TOTP expired')
+                totp.valid = false
+                return
+            } else {
+                console.log('error', error)
+                return
+            }
+        }
+
 
         globalPowerState.set(_globalPowerState);
         devicesDataStore.update(state => {
@@ -89,11 +111,23 @@
             return null
         }
 
-        const res = await axios.post(`${apiUrl}/submit`, {
-            hosts: [device.host],
-            powerState: !device.powerState,
-            totp: totp
-        })
+        let res
+        try {
+            res = await axios.post(`${apiUrl}/submit`, {
+                hosts: [device.host],
+                powerState: !device.powerState,
+                totp: totp
+            })
+        } catch (error) {
+            if (error.code && error.code === "ERR_NETWORK") {
+                console.log('TOTP expired')
+                totp.valid = false
+                return
+            } else {
+                console.log('error', error)
+                return
+            }
+        }
 
         devicesDataStore.update(state => {
             return state.map(i => {
@@ -118,7 +152,8 @@
 
 <div class="bg-neutral-50">
     <div class="block border border-2 border-gray-200 p-2 flex flex-row gap-2">
-        <input type="text" class="text-indigo-900 font-medium px-2 rounded-md" bind:value={totp.token} on:input={validateTOTP}/>
+        <input type="text" class="text-indigo-900 font-medium px-2 rounded-md" bind:value={totp.token}
+               on:input={validateTOTP}/>
         <p class={isTotpSet(totp).class}>{isTotpSet(totp).text}</p>
     </div>
 
@@ -147,21 +182,28 @@
         {#await $devicesDataStore}
             <pre>{JSON.stringify({loading: true})}</pre>
         {:then data}
-            <div class="grid grid-cols-2 gap-1">
+            <div class="
+                flex flex-row flex-wrap
+                gap-1
+            ">
                 {#each data as each}
                     <a on:click={() => toggleDevicePowerState(each)}>
-                        <div class={getClassByPowerState(each)}>
-                            <div class="border border-2 border-amber-500 m-2 grid auto-cols-auto auto-rows-auto gap-1 px-4">
-                                <div class="text-left">
-                                    <h1>{each.room}</h1>
-                                    <h3>Attached Devices: <br>{JSON.stringify(each.attachedDevices)}</h3>
-                                    <h3>Power: {each.powerState === true ? 'On' : 'Off'} </h3>
+                        <div class={getClassByPowerState(each).outer}>
+                            <div class={getClassByPowerState(each).inner}>
+                                <div class="
+                                    text-bold text-left
+                                    grid grid-cols-2 grid-rows-1
+                                ">
+                                    <div class="col-span-1">
+                                        <h1>{each.room}</h1>
+                                        <br/>
+                                        {each.powerState === true ? '🌝' : '🌚'}
+                                    </div>
+                                    <div class="col-span-1">
+                                        <h3>Attached Devices: <br>{JSON.stringify(each.attachedDevices)}</h3>
+                                        <h3>Power: {each.powerState === true ? 'On' : 'Off'} </h3>
+                                    </div>
                                 </div>
-                            </div>
-                            <div>
-                                <p class="text-bold text-center">
-                                    {each.powerState === true ? '🌝' : '🌚'}
-                                </p>
                             </div>
                         </div>
                     </a>
